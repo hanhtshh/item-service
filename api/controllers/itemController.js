@@ -1,16 +1,63 @@
 const categoryModel = require("../models/categoryModels");
 const itemModel = require("../models/itemModels");
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const oderModel = require("../models/oderModels");
+const execPromise = promisify(exec);
 
 class ItemController {
     async get(req, res) {
         try {
             const keySearch = req.query.keySearch;
+            const customerId = req.query.customerId;
+
+            const orderHistories = await oderModel.find({
+                customer: customerId
+            })
+            console.log("Hanh test order", JSON.stringify(orderHistories));
+            const ageCount = {
+                "Trẻ sơ sinh": 0,
+                "Trẻ tập đi": 0,
+                "Thiếu nhi": 0,
+                "Thiếu niên": 0,
+                "Người lớn": 0,
+            }
+
+            orderHistories.forEach((order) => {
+                order?.oder_list?.forEach((item) => {
+                    if (item?.age) {
+                        ageCount[item?.age] += 1
+                    }
+                })
+            })
+
+            let ageMax = "Người lớn";
+            let ageMaxCount = 0;
+            Object.keys(ageCount).forEach((key) => {
+                if (ageCount[key] > ageMaxCount) {
+                    ageMax = key;
+                    ageMaxCount = ageCount[key]
+                }
+            })
+
+
+
             if (keySearch) {
                 const list = await itemModel.find({
                     "name": { "$regex": keySearch, "$options": "i" }
                 })
                     .populate("category");
-                res.json(list);
+                const similarity = (a, b) => {
+                    let common = 0;
+                    const minLength = Math.min(a.length, b.length);
+                    for (let i = 0; i < minLength; i++) {
+                        if (a[i] === b[i]) common++;
+                    }
+                    return common / Math.max(a.length, b.length);
+                };
+                console.log(list);
+
+                res.json(list.sort((a, b) => similarity(b?.age || "", ageMax) - similarity(a?.age || "", ageMax)));
             }
             else {
                 const list = await itemModel.find({})
@@ -24,6 +71,16 @@ class ItemController {
     }
     async post(req, res) {
         try {
+            const shell = `python3 predict_age.py --kich_thuoc=${req.body.size?.[0].name} --chieu_dai=${req.body.length} --chu_vi=${req.body.perimeter} --mau_sac="${req.body.color}" --chat_lieu="${req.body.material}" --kieu_dang="${req.body.style}" --hoa_tiet="${req.body.texture}" --phu_kien="${req.body.accessory}" --do_day="${req.body.thickness}" --tinh_nang_dac_biet="${req.body.nature}"`
+
+            const { stdout, stderr } = await execPromise(shell);
+            console.log("info age", stdout);
+
+            // Nếu có lỗi trong stderr, trả về lỗi
+            if (stderr) {
+                return res.status(500).json({ error: `stderr: ${stderr}` });
+            }
+
             const category = await categoryModel.findOne({
                 name: req.body.category
             })
@@ -35,8 +92,10 @@ class ItemController {
                     sale: req.body.sale,
                     size: req.body.size,
                     price: req.body.price,
-                    category: category._id
+                    category: category._id,
+                    age: stdout.trim()
                 })
+                console.log(item);
                 res.json({
                     name: req.body.name,
                     image: req.body.image,
@@ -47,7 +106,8 @@ class ItemController {
                     category: {
                         _id: category._id,
                         name: category.name
-                    }
+                    },
+                    age: stdout.trim()
                 });
             }
             else {
@@ -58,6 +118,7 @@ class ItemController {
             }
         }
         catch (err) {
+            console.log(err);
             res.status(500).json('err');
         }
     }

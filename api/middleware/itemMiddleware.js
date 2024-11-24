@@ -12,7 +12,16 @@ class ItemMiddleware {
                 quantity: joi.number().min(0).max(100000).exist(),
                 _id: joi.string().optional()
             }).exist()),
-            category: joi.string().max(200).exist()
+            category: joi.string().max(200).exist(),
+            length: joi.number().min(0).max(1000000000).exist(),
+            perimeter: joi.number().min(0).max(1000000000).exist(),
+            color: joi.string().max(200).exist(),
+            material: joi.string().max(200).exist(),
+            style: joi.string().max(200).exist(),
+            texture: joi.string().max(200).exist(),
+            accessory: joi.string().max(200).exist(),
+            thickness: joi.string().max(200).exist(),
+            nature: joi.string().max(200).exist(),
         })
         const validate = schema.validate(req.body);
         if (!validate.error) {

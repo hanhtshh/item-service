@@ -9,7 +9,8 @@ const itemSchema=new mongoose.Schema({
     category:{
         type:mongoose.SchemaTypes.ObjectId,
         ref:"category"
-    }
+    },
+    age:String
 })
 const itemModel= mongoose.model('item', itemSchema);
 module.exports=itemModel;
