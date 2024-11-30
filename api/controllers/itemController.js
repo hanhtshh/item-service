@@ -3,18 +3,25 @@ const itemModel = require("../models/itemModels");
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const oderModel = require("../models/oderModels");
+const customerModel = require("../models/customerModel");
 const execPromise = promisify(exec);
 
 class ItemController {
     async get(req, res) {
         try {
             const keySearch = req.query.keySearch;
-            const customerId = req.query.customerId;
-
-            const orderHistories = await oderModel.find({
-                customer: customerId
+            const email = req.query.userEmail;
+            console.log("test email", email)
+            const orderHistories = (await oderModel.find({
+            }).populate({
+                path: 'customer',
+                match: {
+                    email: email
+                }
+            }).populate({
+                path: 'oder_list.item'
             })
-            console.log("Hanh test order", JSON.stringify(orderHistories));
+            ).filter(order => order.customer);
             const ageCount = {
                 "Trẻ sơ sinh": 0,
                 "Trẻ tập đi": 0,
@@ -25,11 +32,12 @@ class ItemController {
 
             orderHistories.forEach((order) => {
                 order?.oder_list?.forEach((item) => {
-                    if (item?.age) {
-                        ageCount[item?.age] += 1
+                    if (item?.item?.age) {
+                        ageCount[item?.item?.age] += 1
                     }
                 })
             })
+            console.log("Hanh test age count", ageCount);
 
             let ageMax = "Người lớn";
             let ageMaxCount = 0;
@@ -39,6 +47,7 @@ class ItemController {
                     ageMaxCount = ageCount[key]
                 }
             })
+            console.log("test jdfdf", ageMax, ageMaxCount);
 
 
 
@@ -62,10 +71,22 @@ class ItemController {
             else {
                 const list = await itemModel.find({})
                     .populate("category");
+                const similarity = (a, b) => {
+                    let common = 0;
+                    const minLength = Math.min(a.length, b.length);
+                    for (let i = 0; i < minLength; i++) {
+                        if (a[i] === b[i]) common++;
+                    }
+                    return common / Math.max(a.length, b.length);
+                };
+                console.log(list);
+
+                res.json(list.sort((a, b) => similarity(b?.age || "", ageMax) - similarity(a?.age || "", ageMax)));
                 res.json(list);
             }
         }
         catch (err) {
+            console.log(err)
             res.status(404).json('not found');
         }
     }
